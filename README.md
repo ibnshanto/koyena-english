@@ -16,7 +16,3 @@ Sentence Structure, Nouns, Pronouns, Articles, Subject-Verb Agreement, Present T
 1. Install Node.js (nodejs.org)
 2. Terminal in this folder → `npm install` → `npm run dev`
 3. Open the link shown (usually http://localhost:5173)
-
-## How to deploy it live (free)
-1. GitHub account → new repository → upload files
-2. Vercel account (sign in with GitHub) → Import Project → Deploy
