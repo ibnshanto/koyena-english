@@ -1,75 +1,127 @@
-import { Link } from 'react-router-dom'
-import { topics } from '../data/topics.js'
-import { getTopicStats, getAllProgress } from '../storage.js'
+import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext.jsx'
+import { useT } from '../i18n.js'
 
 export default function Profile() {
-  const allProgress = getAllProgress()
-  const contentTopics = topics.filter(t => t.hasContent)
+  const { user, profile, updateProfile, openAuthModal } = useAuth()
+  const { t } = useT()
 
-  const topicStats = contentTopics.map(t => ({
-    ...t,
-    stats: getTopicStats(t.id)
-  }))
+  const [displayName, setDisplayName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
 
-  const totalCompleted = topicStats.reduce((sum, t) => sum + t.stats.completed, 0)
-  const startedTopics = topicStats.filter(t => t.stats.completed > 0)
-  const overallAvg = startedTopics.length
-    ? Math.round(startedTopics.reduce((sum, t) => sum + t.stats.avgPercent, 0) / startedTopics.length)
-    : 0
+  useEffect(() => {
+    if (profile?.username) {
+      setDisplayName(profile.username)
+    } else if (user?.email) {
+      setDisplayName(user.email.split('@')[0])
+    }
+  }, [profile, user])
 
-  const weakestTopic = [...startedTopics].sort((a, b) => a.stats.avgPercent - b.stats.avgPercent)[0]
+  if (!user) {
+    return (
+      <div className="container container--narrow" style={{ marginTop: '3rem', textAlign: 'center' }}>
+        <div className="guest-prompt-card">
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👤</div>
+          <h2>{t('profileTitle')}</h2>
+          <p style={{ margin: '0.5rem 0 1.5rem', color: 'var(--ink-soft)' }}>
+            {t('guestProfilePrompt')}
+          </p>
+          <button type="button" onClick={openAuthModal} className="btn-primary">
+            {t('signIn')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const currentDisplay = displayName || profile?.username || user.email?.split('@')[0] || 'S'
+  const firstLetter = (currentDisplay.charAt(0) || 'S').toUpperCase()
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSuccess(false)
+
+    const trimmed = displayName.trim().slice(0, 30)
+    if (!trimmed) {
+      setError('Display name is required.')
+      return
+    }
+
+    setLoading(true)
+    const res = await updateProfile({ username: trimmed })
+    setLoading(false)
+
+    if (res.success) {
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    } else {
+      setError(res.error || 'Failed to update profile.')
+    }
+  }
 
   return (
-    <div className="container container--narrow">
-      <h1>My Progress</h1>
-      <p className="profile-sub">{startedTopics.length} of {topics.length} topics started · {totalCompleted} exams completed overall</p>
+    <div className="container container--narrow" style={{ marginTop: '2rem' }}>
+      <h1>{t('profileTitle')}</h1>
 
-      <div className="summary-bar">
-        <div className="summary-stat">
-          <span className="summary-number">{overallAvg}%</span>
-          <span className="summary-label">Overall accuracy</span>
+      <div className="profile-card">
+        {/* Big Avatar with First Letter */}
+        <div className="profile-avatar-large">
+          {firstLetter}
         </div>
-        <div className="summary-stat">
-          <span className="summary-number">{totalCompleted}</span>
-          <span className="summary-label">Exams completed</span>
-        </div>
-        <div className="summary-stat">
-          <span className="summary-number">{startedTopics.length}</span>
-          <span className="summary-label">Topics in progress</span>
-        </div>
-      </div>
 
-      <h2 className="section-title">Topic breakdown</h2>
-      <div className="breakdown-list">
-        {topicStats.map(t => (
-          <Link to={`/topic/${t.id}/exams`} key={t.id} className="breakdown-item">
-            <div className="breakdown-top">
-              <span>{t.name}</span>
-              <span className="breakdown-meta">
-                {t.stats.completed > 0 ? `${t.stats.completed}/${t.stats.total} exams · ${t.stats.avgPercent}% avg` : 'Not started'}
-              </span>
+        <form onSubmit={handleSubmit} className="profile-form">
+          {error && (
+            <div className="auth-alert auth-alert--error" style={{ marginBottom: '1rem' }}>
+              ⚠️ {error}
             </div>
-            {t.stats.completed > 0 && (
-              <div className="progress-bar">
-                <div
-                  className="progress-fill"
-                  style={{
-                    width: `${t.stats.avgPercent}%`,
-                    background: t.stats.avgPercent >= 75 ? 'var(--ok)' : t.stats.avgPercent >= 50 ? 'var(--warn)' : 'var(--bad)'
-                  }}
-                />
-              </div>
-            )}
-          </Link>
-        ))}
-      </div>
+          )}
 
-      {weakestTopic && (
-        <div className="focus-box">
-          <h3>Recommended focus</h3>
-          <p><strong>{weakestTopic.name}</strong> — weakest topic ({weakestTopic.stats.avgPercent}%)</p>
-        </div>
-      )}
+          {success && (
+            <div className="auth-alert auth-alert--success" style={{ marginBottom: '1rem' }}>
+              ✓ {t('savedSuccess')}
+            </div>
+          )}
+
+          {/* Email (Read-only) */}
+          <div className="auth-field">
+            <label>{t('emailReadOnlyLabel')}</label>
+            <input
+              type="email"
+              value={user.email || ''}
+              readOnly
+              disabled
+              className="input-readonly"
+            />
+          </div>
+
+          {/* Editable Display Name */}
+          <div className="auth-field">
+            <label htmlFor="display-name-input">{t('displayNameLabel')}</label>
+            <input
+              id="display-name-input"
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              maxLength={30}
+              placeholder={t('displayNamePlaceholder')}
+              required
+            />
+            <span className="auth-hint">Max 30 characters. Duplicates are allowed.</span>
+          </div>
+
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}
+            disabled={loading}
+          >
+            {loading ? t('saving') : t('saveChanges')}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

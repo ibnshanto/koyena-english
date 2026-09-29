@@ -1,8 +1,39 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { topics } from '../data/topics.js'
 import { getTopicStats } from '../storage.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function TopicList() {
+  const { user } = useAuth()
+  const [statsMap, setStatsMap] = useState({})
+
+  useEffect(() => {
+    let isMounted = true
+
+    if (user?.id) {
+      Promise.all(
+        topics.map(async (topic) => {
+          const stats = await getTopicStats(user.id, topic.id)
+          return [topic.id, stats]
+        })
+      ).then((entries) => {
+        if (isMounted) {
+          setStatsMap(Object.fromEntries(entries))
+        }
+      }).catch((err) => {
+        console.error('Error fetching topic stats:', err)
+      })
+    } else {
+      // Clear progress state when logged out or guest
+      setStatsMap({})
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id])
+
   return (
     <div className="container">
       <div className="hero">
@@ -14,7 +45,9 @@ export default function TopicList() {
 
       <div className="topic-grid">
         {topics.map(topic => {
-          const stats = getTopicStats(topic.id)
+          const stats = statsMap[topic.id] || { completed: 0, total: 50, avgPercent: 0 }
+          const percent = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0
+
           return (
             <Link to={`/topic/${topic.id}`} key={topic.id} className={`topic-card ${!topic.hasContent ? 'topic-card--soon' : ''}`}>
               <div className="topic-card-top">
@@ -25,7 +58,7 @@ export default function TopicList() {
               {topic.hasContent && (
                 <div className="topic-progress">
                   <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${(stats.completed / stats.total) * 100}%` }} />
+                    <div className="progress-fill" style={{ width: `${percent}%` }} />
                   </div>
                   <span className="progress-label">{stats.completed}/{stats.total} exams</span>
                 </div>

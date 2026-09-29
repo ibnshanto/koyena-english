@@ -44,7 +44,7 @@ export default function TopicLesson() {
     return (
       <div className="container">
         <p className="soon-message">The lesson for "{topic.name}" is being written and will be added soon.</p>
-        <Link to="/" className="btn-secondary">← Back to topics</Link>
+        <Link to="/grammar" className="btn-secondary">← Back to topics</Link>
       </div>
     )
   }
